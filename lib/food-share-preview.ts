@@ -156,7 +156,7 @@ function localizedKnownKey(value: string): string | undefined {
 }
 
 function looksLikeTechnicalKey(value: string): boolean {
-  return /^(lapta\.|meal\.|recipe\.category\.)/i.test(value);
+  return /^(eatometer\.|meal\.|recipe\.category\.)/i.test(value);
 }
 
 const knownTextKeys: Record<string, string> = {
@@ -168,10 +168,10 @@ const knownTextKeys: Record<string, string> = {
   "meal.lunch": "Обед",
   "meal.dinner": "Ужин",
   "meal.snack": "Перекус",
-  "lapta.mealcategory.breakfast": "Завтрак",
-  "lapta.mealcategory.lunch": "Обед",
-  "lapta.mealcategory.dinner": "Ужин",
-  "lapta.mealcategory.snack": "Перекус",
+  "eatometer.mealcategory.breakfast": "Завтрак",
+  "eatometer.mealcategory.lunch": "Обед",
+  "eatometer.mealcategory.dinner": "Ужин",
+  "eatometer.mealcategory.snack": "Перекус",
   "recipe.category.breakfast": "Завтрак",
   "recipe.category.lunch": "Обед",
   "recipe.category.dinner": "Ужин",
