@@ -32,9 +32,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # `next lint` isn't set up in this repo (no ESLint config) and prompts
-      # interactively when it isn't, which would hang a non-interactive CI
-      # run — so typecheck + build are the checks here, not lint.
+      # There is no ESLint configuration in this small landing-page project,
+      # so typecheck + production build are the CI checks.
       - name: Typecheck
         run: npx tsc --noEmit
 
