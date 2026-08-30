@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPOSITORY: ${{ vars.HARBOR_REGISTRY }}/eatometer/eatometer-food-web
+  GITOPS_FILE: apps/eatometer/food-web/prod/kustomization.yaml
+
+jobs:
+  test:
+    runs-on: linux-builders
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: package.json
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # `next lint` isn't set up in this repo (no ESLint config) and prompts
+      # interactively when it isn't, which would hang a non-interactive CI
+      # run — so typecheck + build are the checks here, not lint.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  image:
+    if: github.event_name == 'push'
+    needs: test
+    runs-on: linux-builders
+    steps:
+      - name: Checkout service
+        uses: actions/checkout@v4
+
+      - name: Login to Harbor
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ vars.HARBOR_REGISTRY }}
+          username: ${{ secrets.HARBOR_USERNAME }}
+          password: ${{ secrets.HARBOR_PASSWORD }}
+
+      - name: Build image
+        run: docker build --platform linux/amd64 -t "${IMAGE_REPOSITORY}:${GITHUB_SHA}" .
+
+      - name: Push image
+        run: docker push "${IMAGE_REPOSITORY}:${GITHUB_SHA}"
+
+      - name: Checkout GitOps
+        uses: actions/checkout@v4
+        with:
+          repository: paninlabs/infra-gitops
+          ref: main
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: infra-gitops
+
+      - name: Update GitOps image
+        run: |
+          cd infra-gitops
+          git config user.name "paninlabs-ci"
+          git config user.email "ci@paninlabs.com"
+          git pull --rebase origin main
+          sed -i -E "s#^([[:space:]]*)newName:.*#\1newName: ${IMAGE_REPOSITORY}#" "${GITOPS_FILE}"
+          sed -i -E "s#^([[:space:]]*)newTag:.*#\1newTag: ${GITHUB_SHA}#" "${GITOPS_FILE}"
+          git add "${GITOPS_FILE}"
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "chore(eatometer): deploy food-web ${GITHUB_SHA}"
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            git pull --rebase origin main
+            sleep $((attempt * 2))
+          done
+          exit 1
